@@ -1,0 +1,409 @@
+---
+title: Basic inventory system in Unity
+description: How to create a simple inventory system in Unity
+prev: false
+sidebar:
+    label: Inventory system - The basics
+---
+
+import { FileTree } from '@astrojs/starlight/components';
+
+Today, we will learn how to create a basic inventory system in Unity. An inventory system is essential for many games, allowing players to collect, store, and manage items they find while they are exploring their adventure. We will add multiple types of inventory items, such as buildables and collectibles. Buildables are items that players can use to construct structures or objects in the game world, while collectibles are items that players can gather for various purposes, such as completing quests or unlocking achievements, or crafting other items.
+
+## The Inventory Item Interface
+
+First, we need to create an interface that defines the properties and methods for our inventory items. This interface will ensure that all inventory items have a consistent structure.
+
+Create a new C# script called `IInventoryItem.cs` and add the following code:
+
+```csharp
+public interface IInventoryItem<TItem, TItemType> {
+    // The item itself, which can be of any type (like a Collectible or Buildable)
+    TItem Item { get; set; }
+
+    // The Type of the item
+    TItemType Type { get; }
+
+    // The amount of the item
+    int Amount { get; set; }
+}
+```
+
+With this generic interface, we can implement different types of inventory items and ensure they all have an Item, a Type and an Amount property.
+
+## The item type "Collectible"
+
+We want to have different types of inventory items. Let's start by creating a `Collectible` item type. 
+Examples for collectibles could be resources like wood, stone, or gold. 
+So we need an Object in which we can define these collectibles. 
+In Unity, you can create a ScriptableObject for this purpose.
+
+We also need an enum to define the different types of collectibles.
+
+Create a new C# script called `CollectibleItemType.cs` and add the following code:
+
+```csharp
+public enum CollectibleItemType {
+    None = 0,
+    Wood = 1000,
+    Stone = 2000,
+    Iron = 3000,
+    Silver = 4000,
+    Gold = 5000,
+}
+```
+
+Now create a new C# script called `CollectibleItem.cs` and add the following code:
+
+```csharp
+[CreateAssetMenu(fileName = "New Collectible Item", menuName = "Items/Collectible Item")]
+public class CollectibleItem : ScriptableObject {
+    // The type of the collectible item
+    public CollectibleItemType type;
+
+    // The icon for the collectible item
+    public Sprite icon;
+}
+```
+
+Now we are able to create different collectible items in Unity by creating new instances of the `CollectibleItem` ScriptableObject. To do so, right-click in the Project window, select `Create > Items > Collectible Item`, and fill in the details for each collectible item type, so you should have five collectible items called "Wood", "Stone", "Iron", "Silver", and "Gold".
+
+To store our CollectibleItems in the inventory, we need to create a class that implements the `IInventoryItem` interface.
+
+So create a new C# script called `CollectibleInventoryItem.cs` and add the following code:
+
+```csharp
+using System;
+using UnityEngine;
+
+[Serializable]
+public class CollectibleInventoryItem: IInventoryItem<CollectibleItem, CollectibleItemType> {
+    public CollectibleItem Item { get => item; set => item = value; }
+    [SerializeField] CollectibleItem item;
+
+    public int Amount { get => amount; set => amount = value; }
+    [SerializeField] int amount;
+
+    public CollectibleItemType Type {
+        get { return item.type; }
+    }
+
+    public Sprite Icon {
+        get { return item.icon; }
+    }
+}
+```
+
+Now we have an inventory item for our collectibles.
+
+
+## The item type "Buildable"
+
+Next, we will create a `Buildable` item type. Examples for buildables could be structures like houses, walls, or towers. Similar to collectibles, we will create a ScriptableObject for buildables and an enum to define the different types of buildables.
+
+Create a new C# script called `BuildableItemType.cs` and add the following code:
+
+```csharp
+public enum BuildableItemType {
+    None = 0,
+    Storage = 1000,
+}
+```
+
+Now create a new C# script called `BuildableItem.cs` and add the following code:
+
+```csharp
+using UnityEngine;
+
+[CreateAssetMenu(fileName = "New Buildable Item", menuName = "Items/Buildable Item")]
+public class BuildableItem : ScriptableObject {
+    public BuildableItemType type;
+    public Sprite icon;
+    public Buildable prefab;
+}
+```
+
+As you see, we now have a prefab property to hold the actual buildable GameObject. For this, we need a simple Buildable class.
+
+Create a new C# script called `Buildable.cs` and add the following code:
+
+```csharp
+using UnityEngine;
+
+public class Buildable : MonoBehaviour {
+
+}
+```
+
+Now we are able to create different buildable items in Unity by creating new instances of the `BuildableItem` ScriptableObject. To do so, right-click in the Project window, select `Create > Items > Buildable Item`, and fill in the details for each buildable item type, so you should have one buildable item called "Storage".
+
+## The Inventory class
+
+Now that we have our inventory item types defined, we need to create the Inventory class that will hold and manage these items.
+
+We need to create a generic Inventory class that can handle different types of inventory items. 
+
+Create a new C# script called `Inventory.cs` and add the following code:
+```csharp
+using System.Collections.Generic;
+using System;
+using Unity.VisualScripting;
+
+[Serializable]
+public class Inventory<
+    InventoryItem, 
+    Item, 
+    ItemType
+> where InventoryItem : IInventoryItem<
+    Item, 
+    ItemType
+>, new() {
+    public int capacity;
+
+    public List<InventoryItem> items = new List<InventoryItem>();
+
+    public Action<InventoryItem> OnItemDeposited;
+    public Action<InventoryItem> OnItemWithdrawn;
+
+    public int Total {
+        get {
+            int total = 0;
+
+            foreach(InventoryItem item in items) {
+                total += item.Amount;
+            }
+
+            return total;
+        }
+    }
+
+    public bool IsFull {
+        get {
+            return Total >= capacity;
+        }
+    }
+
+    public bool IsEmpty {
+        get {
+            return Total == 0;
+        }
+    }
+
+    public int Deposit(List<InventoryItem> itemsToDeposit) {
+        if(IsFull) {
+            return 0;
+        }
+
+        int totalDeposited = 0;
+
+        foreach(InventoryItem item in itemsToDeposit) {
+            totalDeposited += Deposit(item);
+        }
+
+        return totalDeposited;
+    }
+
+    public int Deposit(InventoryItem itemToDeposit) {
+        if(IsFull) {
+            return 0;
+        }
+
+        int existingItemIndex = GetInventoryItemIndexByType(itemToDeposit.Type);
+        
+        if(Total + itemToDeposit.Amount > capacity) {
+            int restCapacity = capacity - Total;
+            itemToDeposit.Amount = restCapacity;
+        }
+
+        if(existingItemIndex == -1) {
+            items.Add(itemToDeposit);
+        } else {
+            InventoryItem inventoryItem = items[existingItemIndex];
+            inventoryItem.Amount += itemToDeposit.Amount;
+            items[existingItemIndex] = inventoryItem;
+        }
+
+        OnItemDeposited?.Invoke(itemToDeposit);
+
+        return itemToDeposit.Amount;
+    }
+
+    public List<InventoryItem> Withdraw(ItemType type, int amount = 1) {
+        List<InventoryItem> withdrawnItems = new List<InventoryItem>();
+
+        if(IsEmpty) {
+            return withdrawnItems;
+        }
+
+        int existingItemIndex = GetInventoryItemIndexByType(type);
+        if(existingItemIndex == -1) {
+            return withdrawnItems;
+        }
+
+        InventoryItem inventoryItem = items[existingItemIndex];
+
+        InventoryItem withdrawnItem = new InventoryItem();
+        withdrawnItem.Item = inventoryItem.Item;
+        withdrawnItem.Amount = 0;
+
+        if(inventoryItem.Amount <= amount) {
+            withdrawnItem.Amount = inventoryItem.Amount;
+            items.RemoveAt(existingItemIndex);
+        } else {
+            withdrawnItem.Amount = amount;
+            inventoryItem.Amount -= amount;
+            items[existingItemIndex] = inventoryItem;
+        }
+
+        withdrawnItems.Add(withdrawnItem);
+
+        OnItemWithdrawn?.Invoke(withdrawnItem);
+
+        return withdrawnItems;
+    }
+
+    public List<InventoryItem> Withdraw(List<InventoryItem> itemsToWithdraw) {
+        List<InventoryItem> withdrawnItems = new List<InventoryItem>();
+
+        foreach(InventoryItem item in itemsToWithdraw) {
+            List<InventoryItem> withdrawn = Withdraw(item.Type, item.Amount);
+            withdrawnItems.AddRange(withdrawn);
+        }
+
+        return withdrawnItems;
+    }
+
+    public List<InventoryItem> Withdraw(int amount = 1) {
+        List<InventoryItem> withdrawnItems = new List<InventoryItem>();
+        
+        if(IsEmpty) {
+            return withdrawnItems;
+        }
+
+        do {
+            InventoryItem inventoryItem = items[0];
+            InventoryItem withdrawnItem = new InventoryItem();
+            withdrawnItem.Item = inventoryItem.Item;
+            withdrawnItem.Amount = 0;
+
+            if(inventoryItem.Amount <= amount) {
+                withdrawnItem.Amount = inventoryItem.Amount;
+                amount -= inventoryItem.Amount;
+                items.RemoveAt(0);
+            } else {
+                withdrawnItem.Amount = amount;
+                inventoryItem.Amount -= amount;
+                amount = 0;
+                items[0] = inventoryItem;
+            }
+
+            withdrawnItems.Add(withdrawnItem);
+
+            OnItemWithdrawn?.Invoke(withdrawnItem);
+        } while(amount > 0 && !IsEmpty);
+
+        return withdrawnItems;
+    }
+
+    public bool ContainsRequiredItems(List<InventoryItem> requiredItems) {
+        foreach(InventoryItem requiredItem in requiredItems) {
+            if(!HasEnoughOfItemType(requiredItem.Type, requiredItem.Amount)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public int GetInventoryItemIndexByType(ItemType type) {
+        return items.FindIndex(item => item.Type.Equals(type));
+    }
+
+    public int GetAmountOfItemType(ItemType type) {
+        int total = 0;
+
+        foreach(InventoryItem item in items) {
+            if(item.Type.Equals(type)) {
+                total += item.Amount;
+            }
+        }
+
+        return total;
+    }
+
+    public bool HasEnoughOfItemType(ItemType itemType, int requiredAmount) {
+        int availableAmount = GetAmountOfItemType(itemType);
+        return availableAmount >= requiredAmount;
+    }
+}
+```
+
+As you see, we have multiple types of Deposit and Withdraw methods to handle different use cases.
+
+We also have public methods to check if the inventory contains required items, get the amount of a specific item type, and check if there is enough of a specific item type.
+
+We have events that get triggered when an item is deposited or withdrawn from the inventory.
+
+And finally, we have properties to check if the inventory is full or empty, as well as a property to get the total number of items in the inventory.
+
+## Usage Example
+
+Now that we have our Inventory class, we can create an instance of it and use it to manage our inventory items.
+
+Create a new C# script called `PlayerController.cs` and add the following code:
+```csharp
+using UnityEngine;
+
+public class PlayerController : MonoBehaviour {
+    public static PlayerController Instance;
+
+    public Inventory<
+        CollectibleInventoryItem,
+        CollectibleItem, 
+        CollectibleItemType
+    > collectibleItemsInventory;
+
+    public Inventory<
+        BuildableInventoryItem,
+        BuildableItem,
+        BuildableItemType
+    > buildableItemsInventory;
+
+    private void Awake() {
+        Instance = this;
+    }
+
+}
+```
+
+Now you can access the player's inventories from anywhere in your code using `PlayerController.Instance.collectibleItemsInventory` and `PlayerController.Instance.buildableItemsInventory`.
+
+At the end, you should have the following structure in your Unity project:
+
+<FileTree>
+- Assets
+    - Objects
+        - Collectibles
+            - Wood.asset
+            - Stone.asset
+            - Iron.asset
+            - Silver.asset
+            - Gold.asset
+        - Buildables
+            - Storage.asset
+    - Scripts
+        - Inventory
+            - Inventory.cs
+            - IInventoryItem.cs
+        - Items
+            - Collectibles
+                - CollectibleItem.cs
+                - CollectibleItemType.cs
+                - CollectibleInventoryItem.cs
+            - Buildables
+                - BuildableItem.cs
+                - BuildableItemType.cs
+                - BuildableInventoryItem.cs
+                - Buildable.cs
+        - PlayerController.cs
+</FileTree>

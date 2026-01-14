@@ -1,0 +1,337 @@
+---
+title: Basic UI for the inventory system
+description: How to create an inventory user interface in Unity
+sidebar:
+    label: Inventory system - The UI
+---
+
+import { FileTree } from '@astrojs/starlight/components';
+
+After you completed the inventory system, it's time to create a user interface (UI) to display the inventory to the player. In this tutorial, we will create a simple inventory UI using Unity's UI Toolkit system.
+
+For the UI, we need three files. One UXML file to define the layout, one USS file to style the UI, and one C# script to handle the logic.
+
+## The UXML file
+
+In the Unity Editor, create a new folder named `UI` inside the `Scripts` folder of your project.
+Inside the `UI` folder, create a new UXML file named `InventoryUi`.
+
+Open the `InventoryUi.uxml` file and add the following:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<ui:UXML
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:ui="UnityEngine.UIElements"
+    xmlns:uie="UnityEditor.UIElements"
+    xsi:noNamespaceSchemaLocation="../../../UIElementsSchema/UIElements.xsd"
+>
+    <Style src="project://database/Assets/Scripts/UI/InventoryUi/InventoryUi.uss"/>
+    <ui:VisualElement name="Container" class="Container">
+        <ui:VisualElement name="CollectibleItems" class="CollectibleItems">
+            <ui:VisualElement name="InventoryItem" class="InventoryItem">
+                <ui:Label text="99" name="ItemQuantity" class="ItemQuantity"/>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="BuildableItems" class="BuildableItems">
+            <ui:VisualElement name="InventoryItem" class="InventoryItem">
+                <ui:Label text="99" name="ItemQuantity" class="ItemQuantity"/>
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>
+```
+
+As you see, we are importing a stylesheet named `InventoryUi.uss`, which we will create in the next step. The layout consists of a container element that holds two sections: one for collectible items and one for buildable items. Each section contains an inventory item element with a label to display the item quantity. These items are just placeholders, which are replaced at runtime.
+
+
+## The USS file
+
+Inside the `UI` folder, create a new USS file named `InventoryUi.uss`.
+
+Open the `InventoryUi.uss` file and add the following:
+
+```css
+.Container {
+    bottom: 0;
+    left: 0;
+    right: 0;
+    
+    height: 50px;
+    flex-direction: row;
+    align-items: center;
+    position: absolute;
+}
+
+.CollectibleItems {
+    height: 50px;
+    flex-direction: row;
+    width: 50%;
+    background-color: rgb(0, 0, 0);
+    margin-right: 5px;
+}
+
+.BuildableItems {
+    height: 50px;
+    flex-direction: row;
+    width: 50%;
+    background-color: rgb(0, 0, 0);
+}
+
+.InventoryItem {
+    width: 45px;
+    height: 45px;
+    margin-right: 5px;
+    position: relative;
+    background-size: contain;
+}
+
+.ItemQuantity {
+    position: absolute;
+    bottom: 1px;
+    right: 1px;
+    padding: 0px;
+    margin: 0px;
+    color: white;
+    font-size: 12px;
+    -unity-font-definition: resource("FlatSkin/Font/Roboto-Bold");
+    -unity-text-align: upper-right;
+    -unity-font-style: bold;
+    -unity-text-outline-width: 1px;
+    -unity-text-outline-color: rgb(0, 0, 0);
+    justify-content: flex-end;
+    align-self: flex-end;
+    align-content: flex-end;
+    align-items: flex-end;
+    height: 12px;
+    flex-direction: row;
+    flex-grow: 1;
+}
+```
+
+You can see, that we will have a bottom bar with two sections. Each section will have inventory items with a quantity label at the bottom right corner.
+
+
+## The controller script
+
+The ui controller script will handle the logic of updating the UI when items are added or removed from the inventory.
+
+Inside the `UI` folder, create a new C# script named `InventoryUi`.
+
+```csharp
+using UnityEngine;
+using UnityEngine.UIElements;
+
+public class InventoryUi : MonoBehaviour {
+    public static InventoryUi Instance;
+
+    public UIDocument uiDocument;
+
+    // the UI element references for the main container 
+    // and the containers for the collectible- and buildable items
+    VisualElement rootElement;
+    VisualElement collectibleItemsContainer;
+    VisualElement buildableItemsContainer;
+
+    // the inventory references for the collectible- and buildable inventory
+    Inventory<
+        CollectibleInventoryItem, 
+        CollectibleItem, 
+        CollectibleItemType
+    > collectibleInventory;
+    
+    Inventory<
+        BuildableInventoryItem, 
+        BuildableItem, 
+        BuildableItemType
+    > buildableInventory;
+
+    private void Awake() {
+        // set the singleton instance (very basic implementation)
+        Instance = this;
+
+        // initialize the UI references
+        rootElement = uiDocument.rootVisualElement.Q<VisualElement>(className: "Container");
+        collectibleItemsContainer = rootElement.Q<VisualElement>(name: "CollectibleItems");
+        buildableItemsContainer = rootElement.Q<VisualElement>(name: "BuildableItems");
+    }
+
+    // set the collectible inventory reference 
+    // and subscribe to its events on withdraw and deposit items
+    public void SetCollectibleInventory(
+        Inventory<
+            CollectibleInventoryItem, 
+            CollectibleItem, 
+            CollectibleItemType
+        > _inventory
+    ) {
+        collectibleInventory = _inventory;
+
+        collectibleInventory.OnItemDeposited += UpdateCollectibleItemsUi;
+        collectibleInventory.OnItemWithdrawn += UpdateCollectibleItemsUi;
+
+        collectibleItemsContainer.Clear();
+
+        UpdateCollectibleItemsUi(null);
+    }
+
+    // set the buildable inventory reference 
+    // and subscribe to its events on withdraw and deposit items
+    public void SetBuildableInventory(
+        Inventory<
+            BuildableInventoryItem, 
+            BuildableItem, 
+            BuildableItemType
+        > _inventory
+    ) {
+        buildableInventory = _inventory;
+
+        buildableInventory.OnItemDeposited += UpdateBuildableItemsUi;
+        buildableInventory.OnItemWithdrawn += UpdateBuildableItemsUi;
+        
+        buildableItemsContainer.Clear();
+        
+        UpdateBuildableItemsUi(null);
+    }
+
+    void UpdateCollectibleItemsUi(CollectibleInventoryItem changedItem) {
+        if(changedItem == null) {
+            foreach(CollectibleInventoryItem item in collectibleInventory.items) {
+                AddCollectibleInventoryElement(item);
+            }
+
+            return;
+        }
+
+        Label changedItemQuantityLabel = collectibleItemsContainer.Q<Label>(
+            name: "ItemQuantity_" + changedItem.Type.ToString()
+        );
+
+        if(changedItemQuantityLabel != null) {
+            int itemAmount = collectibleInventory.GetAmountOfItemType(changedItem.Type);
+
+            if(itemAmount > 0) {
+                changedItemQuantityLabel.text = collectibleInventory
+                    .GetAmountOfItemType(changedItem.Type)
+                    .ToString();
+            } else {
+                VisualElement itemElement = changedItemQuantityLabel.parent;
+                collectibleItemsContainer.Remove(itemElement);
+            }
+
+            return;
+        }
+
+        AddCollectibleInventoryElement(changedItem);
+    }
+
+    void UpdateBuildableItemsUi(BuildableInventoryItem changedItem) {
+        if(changedItem == null) {
+            foreach(BuildableInventoryItem item in buildableInventory.items) {
+                AddBuildableInventoryElement(item);
+            }
+
+            return;
+        }
+
+        Label changedItemQuantityLabel = buildableItemsContainer.Q<Label>(
+            name: "ItemQuantity_" + changedItem.Type.ToString()
+        );
+        
+        if(changedItemQuantityLabel != null) {
+            int itemAmount = buildableInventory.GetAmountOfItemType(changedItem.Type);
+            if(itemAmount > 0) {
+                changedItemQuantityLabel.text = buildableInventory
+                    .GetAmountOfItemType(changedItem.Type)
+                    .ToString();
+            } else {
+                VisualElement itemElement = changedItemQuantityLabel.parent;
+                buildableItemsContainer.Remove(itemElement);
+            }
+            return;
+        }
+
+        AddBuildableInventoryElement(changedItem);
+    }
+
+    void AddCollectibleInventoryElement(CollectibleInventoryItem item) {
+        VisualElement itemElement = new VisualElement();
+        itemElement.name = "InventoryItem";
+        itemElement.AddToClassList("InventoryItem");
+
+        itemElement.style.backgroundImage = new StyleBackground(item.Icon);
+
+        Label itemQuantityLabel = new Label(
+            collectibleInventory.GetAmountOfItemType(item.Type).ToString()
+        );
+
+        itemQuantityLabel.name = "ItemQuantity_" + item.Type.ToString();
+        itemQuantityLabel.AddToClassList("ItemQuantity");
+
+        itemElement.Add(itemQuantityLabel);
+
+        collectibleItemsContainer.Add(itemElement);
+    }
+
+    void AddBuildableInventoryElement(BuildableInventoryItem item) {
+        VisualElement itemElement = new VisualElement();
+        itemElement.name = "InventoryItem";
+        itemElement.AddToClassList("InventoryItem");
+
+        itemElement.style.backgroundImage = new StyleBackground(item.Icon);
+        
+        Label itemQuantityLabel = new Label(
+            buildableInventory.GetAmountOfItemType(item.Type).ToString()
+        );
+
+        itemQuantityLabel.name = "ItemQuantity_" + item.Type.ToString();
+        itemQuantityLabel.AddToClassList("ItemQuantity");
+        
+        itemElement.Add(itemQuantityLabel);
+        
+        buildableItemsContainer.Add(itemElement);
+    }
+}
+```
+
+The AddCollectibleInventoryElement and AddBuildableInventoryElement methods create new UI elements for the given inventory items and add them to the respective container. The UpdateCollectibleItemsUi and UpdateBuildableItemsUi methods update the UI when items are added or removed from the inventory.
+
+We could also add generic methods to reduce code duplication, but for clarity, we keep them separate here.
+
+Finally, attach the InventoryUi script to a new GameObject in your scene and assign a UIDocument component to it. In the UIDocument component, assign the InventoryUi.uxml file to the Source Asset field.
+
+You should have following structure in your Unity project:
+
+<FileTree>
+- Assets
+    - Objects
+        - Collectibles
+            - Wood.asset
+            - Stone.asset
+            - Iron.asset
+            - Silver.asset
+            - Gold.asset
+        - Buildables
+            - Storage.asset
+    - Scripts
+        - Inventory
+            - Inventory.cs
+            - IInventoryItem.cs
+        - Items
+            - Collectibles
+                - CollectibleItem.cs
+                - CollectibleItemType.cs
+                - CollectibleInventoryItem.cs
+            - Buildables
+                - BuildableItem.cs
+                - BuildableItemType.cs
+                - BuildableInventoryItem.cs
+                - Buildable.cs
+        - Ui
+            - InventoryUi
+                - InventoryUi.uss
+                - InventoryUi.uxml
+                - InventoryUi.cs
+        - PlayerController.cs
+</FileTree>

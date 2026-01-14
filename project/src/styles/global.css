@@ -1,0 +1,43 @@
+@layer base, starlight, theme, components, utilities;
+
+@import '@astrojs/starlight-tailwind';
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+
+/* Dark mode colors. */
+:root {
+	--sl-color-accent-low: #460b05;
+	--sl-color-accent: #c63e00;
+	--sl-color-accent-high: #fea366;
+	--sl-color-white: #ffffff;
+	--sl-color-gray-1: #f3ecea;
+	--sl-color-gray-2: #cfc6c4;
+	--sl-color-gray-3: #b0a09d;
+	--sl-color-gray-4: #635451;
+	--sl-color-gray-5: #423432;
+	--sl-color-gray-6: #302321;
+	--sl-color-black: #010104;
+}
+/* Light mode colors. */
+:root[data-theme='light'] {
+	--sl-color-accent-low: #fea366;
+	--sl-color-accent: #c63e00;
+	--sl-color-accent-high: #460b05;
+	--sl-color-white: #010104;
+	--sl-color-gray-1: #302321;
+	--sl-color-gray-2: #423432;
+	--sl-color-gray-3: #635451;
+	--sl-color-gray-4: #978784;
+	--sl-color-gray-5: #c8c0be;
+	--sl-color-gray-6: #f3ecea;
+	--sl-color-gray-7: #f9f5f5;
+	--sl-color-black: #ffffff;
+}
+
+starlight-theme-select {
+	display: none;
+}
+
+.social-icons::after {
+	border-inline-end: 0;
+}

@@ -1,0 +1,7 @@
+#!/bin/bash
+
+docker compose -f compose.production.yml build --no-cache
+
+docker tag tutorials.daspete.at ghcr.io/daspete/tutorials.daspete.at:latest
+
+docker push ghcr.io/daspete/tutorials.daspete.at:latest

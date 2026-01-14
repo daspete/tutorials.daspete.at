@@ -1,0 +1,36 @@
+services:
+  nginx:
+    image: nginx:latest
+    ports:
+      - 80:80
+    volumes:
+      - ./dev/nginx:/etc/nginx/templates
+    networks:
+      tutorialsnet:
+        aliases:
+          - tutorials.daspete.test
+
+  web:
+    build:
+      context: .
+      args:
+        - HOST=0.0.0.0
+        - PORT=3000
+      dockerfile: Dockerfile
+    ports:
+      - 3000:3000
+    hostname: web
+    volumes: 
+      - webvolume:/app
+    env_file:
+      - ./project/.env
+    networks:
+      - tutorialsnet
+
+
+networks:
+  tutorialsnet:
+    driver: bridge
+
+volumes:
+  webvolume:

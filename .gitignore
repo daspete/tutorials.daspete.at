@@ -1,0 +1,10 @@
+.env
+node_modules
+dist
+.dist
+.astro
+build
+.build
+.output
+media/*
+!media/.gitkeep

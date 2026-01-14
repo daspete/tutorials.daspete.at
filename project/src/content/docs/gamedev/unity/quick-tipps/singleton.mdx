@@ -1,0 +1,34 @@
+---
+title: Singleton pattern in Unity
+description: How to implement the singleton pattern in Unity
+prev: false
+sidebar:
+    label: Singleton pattern
+---
+
+The singleton pattern is a design pattern that restricts the instantiation of a class to a single instance and provides a global point of access to that instance. 
+This is particularly useful in game development when you need to manage shared resources or configurations, such as game settings, audio managers, or player controllers.
+
+To implement the singleton pattern in Unity, you can create a generic singleton class that can be inherited by any MonoBehaviour class. Here's an example of how to do this:
+
+``` csharp
+public class Singleton<T> : MonoBehaviour where T : MonoBehaviour {
+    public static T Instance {
+        get; private set;
+    }
+
+    protected virtual void Awake() {
+        if(Instance != null && Instance != this) {
+            Destroy(gameObject);
+        }
+
+        Instance = this;
+    }
+}
+```
+
+In this example, we define a generic class `Singleton<T>` that inherits from `MonoBehaviour`. 
+The `Instance` property is a static property that holds the single instance of the class. 
+In the `Awake` method, we check if an instance already exists. 
+If it does and it's not the current instance, we destroy the current game object to ensure that only one instance exists. 
+Otherwise, we set the `Instance` property to the current instance.

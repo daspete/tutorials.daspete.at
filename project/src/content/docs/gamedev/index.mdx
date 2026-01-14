@@ -1,0 +1,23 @@
+---
+title: Hello game development
+description: Some tipps and tutorials about game development
+tableOfContents: false
+template: splash
+sidebar:
+    label: Game development
+---
+
+
+Here you can find quick tips and tutorials about game development created with ❤️ by [DasPeTe](https://daspete.at).
+
+import { getLatestContent } from '@utils/getLatestContent';
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+<CardGrid>
+  {(await getLatestContent('gamedev')).map((tutorial) => (
+    <Card title={tutorial.data.title} icon="open-book">
+      <div>{tutorial.data.description}</div>
+      <a href={tutorial.slug}>Read more</a>
+    </Card>
+  ))}
+</CardGrid>

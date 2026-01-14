@@ -1,0 +1,40 @@
+services:
+  nginx:
+    image: nginx:latest
+    ports:
+      - 80:80
+    volumes:
+      - ./dev/nginx:/etc/nginx/templates
+    networks:
+      tutorialsnet:
+        aliases:
+          - tutorials.daspete.test
+
+  install-dependencies: 
+    image: node:24
+    working_dir: /app
+    volumes:
+      - ./project:/app
+    networks:
+      - tutorialsnet
+    command: sh -c "corepack enable && yarn"
+
+  web:
+    image: node:24
+    hostname: web
+    working_dir: /app
+    restart: unless-stopped
+    env_file:
+      - ./project/.env
+    volumes:
+      - ./project:/app
+    networks:
+      - tutorialsnet
+    depends_on:
+      install-dependencies:
+        condition: service_completed_successfully
+    command: sh -c "corepack enable && exec yarn dev --host=0.0.0.0 --port=3000"
+
+networks:
+  tutorialsnet:
+    driver: bridge

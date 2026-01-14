@@ -1,0 +1,35 @@
+---
+title: Hello world :)
+description: Quick tips and tutorials by daspete
+template: splash
+hero:
+  image:
+    file: "@assets/Hero.png"
+---
+
+import { Card, CardGrid, LinkButton } from '@astrojs/starlight/components';
+
+Here you can find quick tips and tutorials about web development and game development created with ❤️ by [DasPeTe](https://daspete.at).
+
+<CardGrid>
+  <Card
+    title="Web development tutorials"
+    icon="seti:html"
+  >
+    Find some web development tutorials about Docker, Astro, Vue.js, Node.js and more.
+
+    <LinkButton href="/webdev/" variant="primary" icon="right-arrow">
+      Explore the web development section
+    </LinkButton>
+  </Card>
+  <Card
+    title="Game development tutorials"
+    icon="rocket"
+  >
+    Join readers in the game development section, featuring tutorials for Unity, PhaserJS, BabylonJS and others.
+
+    <LinkButton href="/gamedev/" variant="primary" icon="right-arrow">
+      Explore the game development section
+    </LinkButton>
+  </Card>
+</CardGrid>
