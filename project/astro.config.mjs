@@ -1,8 +1,9 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
+import { pluginFileIcons } from '@xt0rted/expressive-code-file-icons';
 import tailwindcss from '@tailwindcss/vite';
-import starlightGiscus from 'starlight-giscus'
+import starlightGiscus from 'starlight-giscus';
 
 export default defineConfig({
   site: 'https://tutorials.daspete.at',
@@ -17,13 +18,11 @@ export default defineConfig({
       social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/daspete' }],
 
       customCss: ['./src/styles/global.css'],
-      
+
       sidebar: [
         {
           label: 'Web development',
-          items: [
-            { label: 'Vue.js', autogenerate: { directory: 'webdev/vue' } },
-          ]
+          items: [{ label: 'Vue.js', autogenerate: { directory: 'webdev/vue' } }],
         },
         {
           label: 'Game development',
@@ -39,6 +38,15 @@ export default defineConfig({
         },
       ],
 
+      expressiveCode: {
+        plugins: [
+          pluginFileIcons({
+            iconClass: 'size-4',
+            titleClass: 'flex items-center gap-1',
+          }),
+        ],
+      },
+
       plugins: [
         starlightGiscus({
           repo: 'daspete/tutorials.daspete.at',
@@ -46,7 +54,7 @@ export default defineConfig({
           category: 'General',
           categoryId: 'DIC_kwDOQ5q5cc4C08pQ',
         }),
-      ]
+      ],
     }),
   ],
 

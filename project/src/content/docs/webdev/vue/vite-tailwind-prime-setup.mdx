@@ -1,0 +1,403 @@
+---
+title: Vite | Tailwind | PrimeVue Setup
+description: How to set up a Vue.js project with Vite, Tailwind, and PrimeVue
+next: false
+sidebar:
+  label: Vite | Tailwind | PrimeVue Setup
+---
+
+Back in the times, where Vue CLI was the standard way to create Vue.js projects, setting up Tailwind and PrimeVue required quite some effort.
+With Vite, the setup is much easier and faster.
+Let's go through the manual process step by step.
+
+
+## Create a new project
+
+First, we need to create a new project. We do this by creating a new folder and a new package.json file.
+
+```bash
+mkdir myproject
+cd myproject
+touch package.json
+```
+
+Then, we add following content to the package.json file:
+
+```json title="package.json"
+{
+  "name": "myproject",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "vue": "^3.5.26"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "@vitejs/plugin-vue": "^6.0.3",
+    "@vue/tsconfig": "^0.8.1",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1",
+    "vue-tsc": "^3.2.2"
+  }
+}
+```
+
+Now, we can install the dependencies by running:
+
+```bash
+npm install
+# or
+yarn install
+# or
+pnpm install
+```
+
+## Typescript configuration
+
+Next, we need three new files for the Typescript configuration.
+
+```json title="tsconfig.app.json"
+{
+  "extends": "@vue/tsconfig/tsconfig.dom.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+    "types": ["vite/client"],
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue"]
+}
+```
+
+```json title="tsconfig.node.json"
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "types": ["node"],
+    "skipLibCheck": true,
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
+  },
+  "include": ["vite.config.ts"]
+}
+```
+
+```json title="tsconfig.json"
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./tsconfig.app.json"
+    },
+    {
+      "path": "./tsconfig.node.json"
+    }
+  ]
+}
+```
+
+## Vite configuration
+
+Next, we need to create the Vite configuration file.
+
+```ts title="vite.config.ts"
+import { defineConfig } from 'vite';
+import vue from '@vitejs/plugin-vue';
+
+// https://vite.dev/config/
+export default defineConfig({
+  plugins: [vue()],
+});
+```
+
+## Entrypoint Setup
+
+Next, we need to create the index.html, the main.ts and the App.vue files for the entrypoint of our application.
+
+```html title="index.html"
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+    <title>Vue Vite, Tailwind and PrimeVue setup</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script
+      type="module"
+      src="/src/main.ts"
+    ></script>
+  </body>
+</html>
+```
+
+```ts title="src/main.ts"
+import { createApp } from 'vue';
+import App from './App.vue';
+
+createApp(App).mount('#app');
+```
+
+```vue title="src/App.vue"
+<template>
+  <div>Hello app</div>
+</template>
+
+<script setup lang="ts"></script>
+```
+
+After this, you should be able to run the development server with `npm run dev`, `yarn dev` or `pnpm dev` and see the "Hello app" message in your browser at [http://localhost:5173](http://localhost:5173/).
+
+## Tailwind Setup
+
+Add the Tailwind packages to your package.json file
+
+```json ins={12-13}
+{
+  "name": "myproject",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.1.18",
+    "tailwindcss": "^4.1.18",
+    "vue": "^3.5.26"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "@vitejs/plugin-vue": "^6.0.3",
+    "@vue/tsconfig": "^0.8.1",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1",
+    "vue-tsc": "^3.2.2"
+  }
+}
+```
+
+Then, install the new dependencies:
+
+```bash
+npm install
+# or
+yarn install
+# or
+pnpm install
+```
+
+Next, add the tailwind plugin to the Vite configuration:
+
+```ts title="vite.config.ts" rem={8} ins={9-12}
+import { defineConfig } from 'vite';
+import vue from '@vitejs/plugin-vue';
+
+import tailwindcss from '@tailwindcss/vite';
+
+// https://vite.dev/config/
+export default defineConfig({
+  plugins: [vue()],
+  plugins: [vue(), tailwindcss()],
+});
+```
+
+The next step is to create a new CSS file, were we can import Tailwind's base styles.
+
+```css title="src/assets/main.css"
+@import 'tailwindcss';
+```
+
+Finally, we need to import the CSS file in our main.ts file.
+
+```ts title="src/main.ts" ins={1}
+import './assets/css/main.css';
+
+import { createApp } from 'vue';
+import App from './App.vue';
+
+createApp(App).mount('#app');
+```
+
+After you reload the development server, Tailwind should be working in your project.
+
+## PrimeVue Setup
+
+Next, we add PrimeVue to our project. To do this, we need to add some more dependencies to our package.json file.
+
+```json ins={12,14,16}
+{
+  "name": "myproject",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@primeuix/themes": "^2.0.2",
+    "@tailwindcss/vite": "^4.1.18",
+    "primevue": "^4.5.4",
+    "tailwindcss": "^4.1.18",
+    "tailwindcss-primeui": "^0.6.1",
+    "vue": "^3.5.26"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "@vitejs/plugin-vue": "^6.0.3",
+    "@vue/tsconfig": "^0.8.1",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1",
+    "vue-tsc": "^3.2.2"
+  }
+}
+```
+
+Then, install the new dependencies:
+
+```bash
+npm install
+# or
+yarn install
+# or
+pnpm install
+```
+
+Now, we need to import PrimeVue's CSS files in our main.css file.
+
+```css title="src/assets/main.css" ins={2}
+@import 'tailwindcss';
+@import 'tailwindcss-primeui';
+```
+
+To initialize PrimeVue, we can add a theme function, which we call in our main.ts file. So, create a new file at `src/theme/index.ts` with following content:
+
+```ts title="src/theme/index.ts"
+import { type App } from 'vue';
+
+import PrimeVue from 'primevue/config';
+
+// PrimeVue Services
+import ConfirmationService from 'primevue/confirmationservice';
+import ToastService from 'primevue/toastservice';
+
+// PrimeVue Themes
+import Aura from '@primeuix/themes/aura';
+import { definePreset } from '@primeuix/themes';
+
+// PrimeVue Directives
+import { FocusTrap, Ripple } from 'primevue';
+
+const preset = definePreset(Aura, {
+  semantic: {
+    primary: {
+      50: '#fff1ed',
+      100: '#fee6e0',
+      200: '#fec8ba',
+      300: '#fead95',
+      400: '#fd9167',
+      500: '#f97316',
+      600: '#c65a0f',
+      700: '#944108',
+      800: '#652a04',
+      900: '#3c1601',
+      950: '#260b01',
+    },
+  },
+});
+
+export const theme = (app: App) => {
+  app.use(PrimeVue, {
+    ripple: true,
+    theme: {
+      preset,
+      options: {
+        darkModeSelector: '.dark',
+        cssLayer: {
+          name: 'primevue',
+          order: 'theme, base, primevue',
+        },
+      },
+    },
+  });
+
+  app.use(ConfirmationService);
+  app.use(ToastService);
+
+  app.directive('ripple', Ripple);
+  app.directive('focustrap', FocusTrap);
+};
+```
+
+As you see, we are creating a custom preset based on the Aura theme. We also activate the ConfirmationService and the ToastService, as well as the Rippe directive for the buttons.
+
+In the main.ts file, we can now call this theme function:
+
+```ts title="src/main.ts" rem={7} ins={5,8-12}
+import './assets/css/main.css';
+
+import { createApp } from 'vue';
+import App from './App.vue';
+import { theme } from './theme';
+
+createApp(App).mount('#app');
+const app = createApp(App);
+
+theme(app);
+
+app.mount('#app');
+```
+
+## Usage
+
+Now we are ready to use PrimeVue components in our application. For example, we can add a button to our App.vue file:
+
+```vue title="src/App.vue" rem={3} ins={4,9}
+<template>
+    <div>
+        Hello app
+        <Button label="Click Me" />
+    </div>
+</template>
+
+<script setup lang="ts">
+import { Button } from 'primevue';
+</script>
+```
+
+You should now see a styled PrimeVue button in your application.
+
+That's it! You have successfully set up a Vue.js project with Vite, Tailwind, and PrimeVue.

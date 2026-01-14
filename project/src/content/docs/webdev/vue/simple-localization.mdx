@@ -3,7 +3,7 @@ title: Simple localization
 description: How to write a simple localization composable for Vue.js
 next: false
 sidebar:
-    label: Simple localization
+  label: Simple localization
 ---
 
 If you want to reduce external dependencies, you can write a simple localization composable for Vue.js by yourself.
@@ -13,92 +13,89 @@ Let's go through the process step by step.
 
 At first, we need a folder for the language files, let's call it "lang". In this folder, we create some TS files, one for each language we want to support. You could also create some JSON files, or use an external API for the language "files", but for simplicity, we will use TS files here.
 
-``` ts title="lang/de.ts"
+```ts title="lang/de.ts"
 export const de = {
-    global: {
-        welcome: 'Willkommen',
-    },
+  global: {
+    welcome: 'Willkommen',
+  },
 };
 ```
 
-``` ts title="lang/en.ts"
+```ts title="lang/en.ts"
 export const en = {
-    global: {
-        welcome: 'Welcome',
-    },
+  global: {
+    welcome: 'Welcome',
+  },
 };
 ```
 
 ## The composable
 
-Next, we need the composable itself. Let's create a file called "useLocalization.ts" in the "composables" folder. 
+Next, we need the composable itself. Let's create a file called "useLocalization.ts" in the "composables" folder.
 In this composable, we will import the language files.
 
-``` ts title="composables/useLocalization.ts"
+```ts title="composables/useLocalization.ts"
 import { ref } from 'vue';
 
 import { de } from '../lang/de';
 import { en } from '../lang/en';
 
-export const useLocalization = () => {
-
-}
-
+export const useLocalization = () => {};
 ```
 
-Next, we need some types for our localization data. We need a "LanguageKeys" type, which is a union type of the language codes we want to support. 
+Next, we need some types for our localization data. We need a "LanguageKeys" type, which is a union type of the language codes we want to support.
 
-``` ts title="composables/useLocalization.ts"
+```ts title="composables/useLocalization.ts"
 type LanguageKeys = 'de' | 'en';
 ```
 
-Then, we need an utility type to convert the nested objects of the language files into a flat structure with dot notation keys. 
+Then, we need an utility type to convert the nested objects of the language files into a flat structure with dot notation keys.
 
-``` ts title="composables/useLocalization.ts"
+```ts title="composables/useLocalization.ts"
 type TypeFromObjectStringPath<T, K extends keyof T> = K extends string
-    ? T[K] extends Record<string, any>
-        ? T[K] extends ArrayLike<any>
-            ? K | `${K}.${TypeFromObjectStringPath<T[K], Exclude<keyof T[K], keyof any[]>>}`
-            : K | `${K}.${TypeFromObjectStringPath<T[K], keyof T[K]>}`
-        : K
-    : never;
+  ? T[K] extends Record<string, any>
+    ? T[K] extends ArrayLike<any>
+      ? K | `${K}.${TypeFromObjectStringPath<T[K], Exclude<keyof T[K], keyof any[]>>}`
+      : K | `${K}.${TypeFromObjectStringPath<T[K], keyof T[K]>}`
+    : K
+  : never;
 type ObjectStringPath<T> = TypeFromObjectStringPath<T, keyof T> | keyof T;
 ```
 
 Now, we need a type for the configuration of the composable.
 
-``` ts title="composables/useLocalization.ts"
+```ts title="composables/useLocalization.ts"
 type LocalizationConfig = {
-    languages: Record<LanguageKeys, string>;
-    defaultLanguage: LanguageKeys;
+  languages: Record<LanguageKeys, string>;
+  defaultLanguage: LanguageKeys;
 };
 ```
 
 Let's create a strings object, where the imported language strings are stored.
 
-``` ts title="composables/useLocalization.ts"
+```ts title="composables/useLocalization.ts"
 const strings: Record<LanguageKeys, Record<string, any>> = {
-    de,
-    en,
+  de,
+  en,
 };
 ```
 
 Also, create a function to receive the current language stored in the localStorage.
 
-``` ts title="composables/useLocalization.ts"
+```ts title="composables/useLocalization.ts"
 const getLanguageKeyFromLocalStorage = () => {
-    if (!localStorage.getItem('language')) {
-        return null;
-    }
+  if (!localStorage.getItem('language')) {
+    return null;
+  }
 
-    return localStorage.getItem('language') as LanguageKeys;
+  return localStorage.getItem('language') as LanguageKeys;
 };
 ```
 
 Now, we can implement the composable itself. First, we create a config object for the localization settings.
 Then, we create a reactive variable for the current language, and initialize it with the value from localStorage or the default language from the config.
 
-``` ts title="composables/useLocalization.ts"
+```ts title="composables/useLocalization.ts"
 const config: LocalizationConfig = {
     languages: {
         en: 'English',
@@ -115,108 +112,105 @@ export const useLocalization = () => {
 
 Next, we create a function to change the current language and store it in localStorage.
 
-``` ts title="composables/useLocalization.ts"
+```ts title="composables/useLocalization.ts"
 const setLanguage = (languageKey: LanguageKeys) => {
-    if (!strings[languageKey]) {
-        console.warn(`Language ${languageKey} not found.`);
-        return;
-    }
+  if (!strings[languageKey]) {
+    console.warn(`Language ${languageKey} not found.`);
+    return;
+  }
 
-    currentLanguage.value = languageKey;
-    localStorage.setItem('language', languageKey);
+  currentLanguage.value = languageKey;
+  localStorage.setItem('language', languageKey);
 };
 ```
 
 We also create a function to get the current language.
 
-``` ts title="composables/useLocalization.ts"
+```ts title="composables/useLocalization.ts"
 const getLanguage = () => {
-    const language = getLanguageKeyFromLocalStorage();
+  const language = getLanguageKeyFromLocalStorage();
 
-    if (language && strings[language]) {
-        currentLanguage.value = language;
-    }
+  if (language && strings[language]) {
+    currentLanguage.value = language;
+  }
 
-    return currentLanguage.value;
+  return currentLanguage.value;
 };
 ```
 
 Now, we can implement the translation function. To do so, create a function named "translate", that takes a key in dot notation as parameter and returns the found string or the key, if nothing was found.
 
-``` ts title="composables/useLocalization.ts"
+```ts title="composables/useLocalization.ts"
 // we use the german translation type as default language structure
 const translate = (key: ObjectStringPath<typeof strings.de>): string => {
-    let languageStrings: Record<string, unknown> = strings[currentLanguage.value];
+  let languageStrings: Record<string, unknown> = strings[currentLanguage.value];
 
-    const keyParts = key.split('.');
+  const keyParts = key.split('.');
 
-    if (keyParts.length < 2) {
-        console.warn(`Invalid translation key: ${key}`);
-        return key;
-    }
-
-    for (let i = 0; i < keyParts.length; i++) {
-        const keyPart = keyParts[i];
-
-        if (!languageStrings || (keyPart && !languageStrings[keyPart]) || !keyPart) {
-            console.warn(`Translation key not found: ${key}`);
-            return key;
-        }
-        
-        languageStrings = languageStrings[keyPart] as Record<string, unknown>;
-    }
-
-    if (typeof languageStrings === 'string') {
-        return languageStrings;
-    }
-
-    console.warn(`Translation key does not resolve to a string: ${key}`);
-
+  if (keyParts.length < 2) {
+    console.warn(`Invalid translation key: ${key}`);
     return key;
+  }
+
+  for (let i = 0; i < keyParts.length; i++) {
+    const keyPart = keyParts[i];
+
+    if (!languageStrings || (keyPart && !languageStrings[keyPart]) || !keyPart) {
+      console.warn(`Translation key not found: ${key}`);
+      return key;
+    }
+
+    languageStrings = languageStrings[keyPart] as Record<string, unknown>;
+  }
+
+  if (typeof languageStrings === 'string') {
+    return languageStrings;
+  }
+
+  console.warn(`Translation key does not resolve to a string: ${key}`);
+
+  return key;
 };
 ```
 
 Next, we also implement a count translation (none | one | many) function.
 
-``` ts title="composables/useLocalization.ts"
+```ts title="composables/useLocalization.ts"
 const translateCount = (key: ObjectStringPath<typeof strings.de>, count: number): string => {
-    let translation = translate(key);
+  let translation = translate(key);
 
-    const translationPluralizations = translation.split('|');
+  const translationPluralizations = translation.split('|');
 
-    if (translationPluralizations.length === 1) {
-        return translation.replace('{count}', count.toString());
+  if (translationPluralizations.length === 1) {
+    return translation.replace('{count}', count.toString());
+  }
+
+  if (translationPluralizations.length === 2) {
+    translation = count === 0 ? translationPluralizations[0] ?? ''.trim() : translationPluralizations[1] ?? ''.trim();
+    return translation.replace('{count}', count.toString());
+  }
+
+  if (translationPluralizations.length === 3) {
+    if (count === 0) {
+      translation = translationPluralizations[0] ?? ''.trim();
+    } else if (count === 1) {
+      translation = translationPluralizations[1] ?? ''.trim();
+    } else {
+      translation = translationPluralizations[2] ?? ''.trim();
     }
 
-    if (translationPluralizations.length === 2) {
-        translation = count === 0 
-            ? translationPluralizations[0] ?? ''.trim() 
-            : translationPluralizations[1] ?? ''.trim()
-        ;
-        return translation.replace('{count}', count.toString());
-    }
+    return translation.replace('{count}', count.toString());
+  }
 
-    if (translationPluralizations.length === 3) {
-        if (count === 0) {
-            translation = translationPluralizations[0] ?? ''.trim();
-        } else if (count === 1) {
-            translation = translationPluralizations[1] ?? ''.trim();
-        } else {
-            translation = translationPluralizations[2] ?? ''.trim();
-        }
+  translation = translation.replace('{count}', count.toString());
 
-        return translation.replace('{count}', count.toString());
-    }
-
-    translation = translation.replace('{count}', count.toString());
-
-    return translation;
+  return translation;
 };
 ```
 
 Finally, we return the functions and the current language variable from the composable.
 
-``` ts title="composables/useLocalization.ts"
+```ts title="composables/useLocalization.ts"
     return {
         currentLanguage,
         setLanguage,
@@ -234,11 +228,11 @@ Finally, we return the functions and the current language variable from the comp
 
 Now, you can use the `useLocalization` composable in your Vue components to manage localization in your application.
 
-``` vue title="ExampleComponent.vue"
+```vue title="ExampleComponent.vue"
 <template>
-    <div>
-        <h1>{{ $t('global.welcome') }}</h1>
-    </div>
+  <div>
+    <h1>{{ $t('global.welcome') }}</h1>
+  </div>
 </template>
 
 <script lang="ts" setup>
