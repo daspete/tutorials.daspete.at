@@ -146,8 +146,7 @@ Now, we can implement the translation function. To do so, create a function name
 ``` ts title="composables/useLocalization.ts"
 // we use the german translation type as default language structure
 const translate = (key: ObjectStringPath<typeof strings.de>): string => {
-    // set the current language strings
-    let languageStrings = strings[currentLanguage.value];
+    let languageStrings: Record<string, unknown> = strings[currentLanguage.value];
 
     const keyParts = key.split('.');
 
@@ -157,13 +156,14 @@ const translate = (key: ObjectStringPath<typeof strings.de>): string => {
     }
 
     for (let i = 0; i < keyParts.length; i++) {
-        // @ts-expect-error TypeScript does not know the structure of languageStrings
-        if (!languageStrings?.[keyParts[i]]) {
+        const keyPart = keyParts[i];
+
+        if (!languageStrings || (keyPart && !languageStrings[keyPart]) || !keyPart) {
             console.warn(`Translation key not found: ${key}`);
             return key;
         }
-        // @ts-expect-error TypeScript does not know the structure of languageStrings
-        languageStrings = languageStrings[keyParts[i]];
+        
+        languageStrings = languageStrings[keyPart] as Record<string, unknown>;
     }
 
     if (typeof languageStrings === 'string') {
@@ -190,21 +190,21 @@ const translateCount = (key: ObjectStringPath<typeof strings.de>, count: number)
 
     if (translationPluralizations.length === 2) {
         translation = count === 0 
-            ? translationPluralizations[0]!.trim() 
-            : translationPluralizations[1]!.trim()
+            ? translationPluralizations[0] ?? ''.trim() 
+            : translationPluralizations[1] ?? ''.trim()
         ;
-        
         return translation.replace('{count}', count.toString());
     }
 
     if (translationPluralizations.length === 3) {
         if (count === 0) {
-            translation = translationPluralizations[0]!.trim();
+            translation = translationPluralizations[0] ?? ''.trim();
         } else if (count === 1) {
-            translation = translationPluralizations[1]!.trim();
+            translation = translationPluralizations[1] ?? ''.trim();
         } else {
-            translation = translationPluralizations[2]!.trim();
+            translation = translationPluralizations[2] ?? ''.trim();
         }
+
         return translation.replace('{count}', count.toString());
     }
 
