@@ -2,6 +2,7 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
 import tailwindcss from '@tailwindcss/vite';
+import starlightGiscus from 'starlight-giscus'
 
 export default defineConfig({
   site: 'https://tutorials.daspete.at',
@@ -37,6 +38,15 @@ export default defineConfig({
           ],
         },
       ],
+
+      plugins: [
+        starlightGiscus({
+          repo: 'daspete/tutorials.daspete.at',
+          repoId: 'R_kgDOQ5q5cQ',
+          category: 'General',
+          categoryId: 'DIC_kwDOQ5q5cc4C08pQ',
+        }),
+      ]
     }),
   ],
 
