@@ -12,6 +12,7 @@
   "dependencies": {
     "@astrojs/starlight": "^0.37.2",
     "@astrojs/starlight-tailwind": "^4.0.2",
+    "@expressive-code/plugin-collapsible-sections": "^0.41.5",
     "@tailwindcss/vite": "^4.1.18",
     "@xt0rted/expressive-code-file-icons": "^1.0.0",
     "astro": "^5.16.8",

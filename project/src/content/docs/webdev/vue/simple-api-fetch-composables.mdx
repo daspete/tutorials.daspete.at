@@ -1,0 +1,974 @@
+---
+title: Simple API Fetch composable
+description: How to create a simple API fetch composable in Vue.js
+next: false
+sidebar:
+  label: Simple API Fetch composable
+---
+
+When working with APIs in Vue.js, it's common to create a composable to handle API requests.
+This allows you to reuse the same logic across different components.
+Let's go through the process step by step. We will use the Faker API (https://fakerapi.it) as an example API.
+
+## The useApi composable
+
+First, we create a new file called `useApi.ts` in the `composables` folder.
+In this file, we will create a simple API fetch composable using the Fetch API.
+
+```ts title="composables/useApi.ts"
+export const useApi = (apiUrl: string) => {
+  // create default request options for the default headers, or credentials if needed
+  const defaultRequestOptions: Partial<RequestInit> = {
+    // credentials: 'include',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+  };
+
+  // utility function to get headers, can be extended to add auth tokens etc.
+  const getHeaders = () => {
+    const headers: Record<string, string> = {
+      ...(defaultRequestOptions.headers as Record<string, string>),
+    };
+
+    // here you can add more headers if needed, e.g., authentication tokens
+
+    return headers;
+  };
+
+  // main function to perform the fetch request
+  const fetchFromApi = async (method: string, endpoint: string, data?: unknown) => {
+    const response = await fetch(`${apiUrl}${endpoint}`, {
+      ...defaultRequestOptions,
+      method,
+      headers: getHeaders(),
+      body: data ? JSON.stringify(data) : undefined,
+    });
+
+    if (!response.ok) {
+      try {
+        // try to get error message from response
+        // here you can customize error handling as needed
+        const error = await response.json();
+        throw new Error(error.message || 'API request failed');
+      } catch (error) {
+        throw error;
+      }
+    }
+
+    return response.json();
+  };
+
+  // helper methods for different HTTP verbs
+  const get = async (endpoint: string) => fetchFromApi('GET', endpoint);
+  const post = async (endpoint: string, data: unknown) => fetchFromApi('POST', endpoint, data);
+  const put = async (endpoint: string, data: unknown) => fetchFromApi('PUT', endpoint, data);
+  const del = async (endpoint: string) => fetchFromApi('DELETE', endpoint);
+
+  return {
+    get,
+    post,
+    put,
+    del,
+  };
+};
+```
+
+## Usage of the plain useApi composable
+
+Now that we have our `useApi` composable, we can use it in our Vue components.
+
+```vue title="src/components/UserList.vue"
+<template>
+  <div>
+    User List Component
+
+    <ul>
+      <li
+        v-for="user in users"
+        :key="user.id"
+      >
+        {{ user.firstname }} {{ user.lastname }} - {{ user.email }}
+      </li>
+    </ul>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { onMounted, ref, type Ref } from 'vue';
+import { useApi } from '../composables/useApi';
+
+// initialize the useApi composable with the base URL of the Faker API
+const { get } = useApi('https://fakerapi.it/api/v2/');
+
+// define a User type for better type checking
+type User = {
+  id: number;
+  firstname: string;
+  lastname: string;
+  email: string;
+};
+// reactive variable to hold the list of users
+const users: Ref<User[]> = ref([]);
+
+onMounted(async () => {
+  // fetch users from the API and assign to the users variable
+  users.value = (await get('users')).data;
+});
+</script>
+```
+
+In this example, we created a `UserList` component that fetches a list of users from the Faker API using our `useApi` composable.
+When the component is mounted, it calls the `get` method to fetch the users and displays them in a list.
+
+But, you see, there are some things missing here, like the loading state or error handling. Or maybe you want to have a more specific composable for different entities, like users, posts, etc.
+Let's improve our composable to handle these cases.
+
+## Generic entity composable
+
+Now, that we have a generic `useApi` composable, we can create a generic useEntity composable that utilize it.
+
+First, we create a new file called `useEntity.ts` in the `composables` folder.
+
+```ts title="composables/useEntity.ts"
+import { ref } from 'vue';
+import { useApi } from './useApi';
+
+export type EntitySettings = {
+  // the API endpoint for the entity
+  endpoint: string;
+  // the key of the response array data
+  listDataKey: string;
+};
+
+// Options for fetching list data
+// These can be extended based on API capabilities
+export type FetchListOptions<T extends { id: number }> = {
+  page?: number;
+  limit?: number;
+  search?: string;
+  sortBy?: keyof T;
+  sortOrder?: 1 | -1;
+};
+
+export const useEntity = <T extends { id: number }>(settings: EntitySettings) => {
+  // use the useApi composable with the base URL of the Faker API
+  const { get, post, put, del } = useApi('https://fakerapi.it/api/v2/');
+};
+```
+
+As you see, we have defined some types for the entity settings and fetch options.
+The FetchListOptions type should be extended based on the capabilities of the API you are working with.
+
+### Fetch single items
+
+Next, we add the feature to fetch single items by id.
+
+```ts title="composables/useEntity.ts" ins={4-18}
+export const useEntity = <T extends { id: number }>(settings: EntitySettings) => {
+  const { get, post, put, del } = useApi('https://fakerapi.it/api/v2/');
+
+  // reactive variable to hold loading state
+  const isLoadingItem = ref(false);
+  // reactive variable to hold the fetched item
+  const dataItem = ref<T | null>(null);
+
+  // Fetch single item method
+  const fetchItemById = async (id: number) => {
+    isLoadingItem.value = true;
+
+    const response = await get(`${settings.endpoint}/${id}`);
+    dataItem.value = response || null;
+
+    isLoadingItem.value = false;
+
+    return dataItem.value;
+  };
+};
+```
+
+### Fetch list of items
+
+Now we can add the feature to fetch a list of items with optional parameters.
+
+```ts title="composables/useEntity.ts" ins={21-92} collapse={2-20}
+export const useEntity = <T extends { id: number }>(settings: EntitySettings) => {
+  const { get, post, put, del } = useApi('https://fakerapi.it/api/v2/');
+
+  // reactive variable to hold loading state
+  const isLoadingItem = ref(false);
+  // reactive variable to hold the fetched item
+  const dataItem = ref<T | null>(null);
+
+  // Fetch single item method
+  const fetchItemById = async (id: number) => {
+    isLoadingItem.value = true;
+
+    const response = await get(`${settings.endpoint}/${id}`);
+    dataItem.value = response || null;
+
+    isLoadingItem.value = false;
+
+    return dataItem.value;
+  };
+
+  // List configuration
+  const isLoadingList = ref(false);
+  const dataList = ref<T[]>([]);
+  const total = ref(0);
+  const page = ref(1);
+  const limit = ref(10);
+
+  // Filter configuration
+  const searchValue = ref<string>('');
+  const sortField = ref<keyof T>('id');
+  const sortOrder = ref<1 | -1>(1);
+
+  // Error configuration
+  const errors = ref([]);
+
+  // Helper function to create query params
+  // This varies based on your API design
+  const createQueryParams = (params: Partial<FetchListOptions<T>>): string => {
+    const query = new URLSearchParams();
+
+    if (params.page) {
+      query.append('page', String(params.page));
+    }
+    if (params.limit) {
+      query.append('limit', String(params.limit));
+    }
+    if (params.search && params.search.trim() !== '') {
+      query.append('search', params.search);
+    }
+    if (params.sortBy) {
+      query.append('sortBy', String(params.sortBy));
+    }
+    if (params.sortOrder) {
+      query.append('sortOrder', params.sortOrder === -1 ? 'desc' : 'asc');
+    }
+
+    return query.toString();
+  };
+
+  // Fetch list methods
+  const setFetchListOptions = (options: Partial<FetchListOptions<T>>) => {
+    if (options.page) page.value = options.page;
+    if (options.limit) limit.value = options.limit;
+    if (options.search) searchValue.value = options.search;
+    if (options.sortBy) sortField.value = options.sortBy;
+    if (options.sortOrder) sortOrder.value = options.sortOrder;
+  };
+
+  const fetchList = async (fetchOptions?: Partial<FetchListOptions<T>>) => {
+    if (fetchOptions) {
+      setFetchListOptions(fetchOptions);
+    }
+
+    isLoadingList.value = true;
+
+    const response = await get(
+      `${settings.endpoint}?${createQueryParams({
+        page: page.value,
+        limit: limit.value,
+        search: searchValue.value,
+        sortBy: sortField.value,
+        sortOrder: sortOrder.value,
+      })}`
+    );
+
+    dataList.value = response[settings.listDataKey] || [];
+    total.value = response.total || 0;
+
+    isLoadingList.value = false;
+
+    return dataList.value;
+  };
+};
+```
+
+### Mutation methods
+
+Now, we can add methods for creating, updating, and deleting items.
+
+```ts title="composables/useEntity.ts" ins={94-149} collapse={2-93}
+export const useEntity = <T extends { id: number }>(settings: EntitySettings) => {
+  const { get, post, put, del } = useApi('https://fakerapi.it/api/v2/');
+
+  // reactive variable to hold loading state
+  const isLoadingItem = ref(false);
+  // reactive variable to hold the fetched item
+  const dataItem = ref<T | null>(null);
+
+  // Fetch single item method
+  const fetchItemById = async (id: number) => {
+    isLoadingItem.value = true;
+
+    const response = await get(`${settings.endpoint}/${id}`);
+    dataItem.value = response || null;
+
+    isLoadingItem.value = false;
+
+    return dataItem.value;
+  };
+
+  // List configuration
+  const isLoadingList = ref(false);
+  const dataList = ref<T[]>([]);
+  const total = ref(0);
+  const page = ref(1);
+  const limit = ref(10);
+
+  // Filter configuration
+  const searchValue = ref<string>('');
+  const sortField = ref<keyof T>('id');
+  const sortOrder = ref<1 | -1>(1);
+
+  // Error configuration
+  const errors = ref([]);
+
+  // Helper function to create query params
+  // This varies based on your API design
+  const createQueryParams = (params: Partial<FetchListOptions<T>>): string => {
+    const query = new URLSearchParams();
+
+    if (params.page) {
+      query.append('page', String(params.page));
+    }
+    if (params.limit) {
+      query.append('limit', String(params.limit));
+    }
+    if (params.search && params.search.trim() !== '') {
+      query.append('search', params.search);
+    }
+    if (params.sortBy) {
+      query.append('sortBy', String(params.sortBy));
+    }
+    if (params.sortOrder) {
+      query.append('sortOrder', params.sortOrder === -1 ? 'desc' : 'asc');
+    }
+
+    return query.toString();
+  };
+
+  // Fetch list methods
+  const setFetchListOptions = (options: Partial<FetchListOptions<T>>) => {
+    if (options.page) page.value = options.page;
+    if (options.limit) limit.value = options.limit;
+    if (options.search) searchValue.value = options.search;
+    if (options.sortBy) sortField.value = options.sortBy;
+    if (options.sortOrder) sortOrder.value = options.sortOrder;
+  };
+
+  const fetchList = async (fetchOptions?: Partial<FetchListOptions<T>>) => {
+    if (fetchOptions) {
+      setFetchListOptions(fetchOptions);
+    }
+
+    isLoadingList.value = true;
+
+    const response = await get(
+      `${settings.endpoint}?${createQueryParams({
+        page: page.value,
+        limit: limit.value,
+        search: searchValue.value,
+        sortBy: sortField.value,
+        sortOrder: sortOrder.value,
+      })}`
+    );
+
+    dataList.value = response[settings.listDataKey] || [];
+    total.value = response.total || 0;
+
+    isLoadingList.value = false;
+
+    return dataList.value;
+  };
+
+  // Mutation methods (create, update, delete)
+  const createItem = async (itemData: Partial<T>) => {
+    if (isCreatingItem.value) return;
+
+    isCreatingItem.value = true;
+
+    errors.value = [];
+
+    try {
+      dataItem.value = await post(settings.endpoint, itemData);
+    } catch (error: any) {
+      errors.value = error.message || ['An error occurred while creating the item.'];
+      throw error;
+    } finally {
+      isCreatingItem.value = false;
+    }
+
+    return dataItem.value;
+  };
+
+  const updateItem = async (id: number, itemData: Partial<T>) => {
+    if (isUpdatingItem.value) return;
+
+    isUpdatingItem.value = true;
+
+    errors.value = [];
+
+    try {
+      dataItem.value = await put(`${settings.endpoint}/${id}`, itemData);
+    } catch (error: any) {
+      errors.value = error.message || ['An error occurred while updating the item.'];
+      throw error;
+    } finally {
+      isUpdatingItem.value = false;
+    }
+
+    return dataItem.value;
+  };
+
+  const deleteItem = async (id: number) => {
+    if (isDeletingItem.value) return;
+
+    isDeletingItem.value = true;
+
+    errors.value = [];
+
+    try {
+      await del(`${settings.endpoint}/${id}`);
+      dataItem.value = null;
+    } catch (error: any) {
+      errors.value = error.message || ['An error occurred while deleting the item.'];
+      throw error;
+    } finally {
+      isDeletingItem.value = false;
+    }
+  };
+};
+```
+
+### Filtering, Sorting, and Pagination
+
+Now, we add some helper methods to handle filtering, sorting, and pagination.
+
+```ts title="composables/useEntity.ts" ins={151-175} collapse={2-150}
+export const useEntity = <T extends { id: number }>(settings: EntitySettings) => {
+  const { get, post, put, del } = useApi('https://fakerapi.it/api/v2/');
+
+  // reactive variable to hold loading state
+  const isLoadingItem = ref(false);
+  // reactive variable to hold the fetched item
+  const dataItem = ref<T | null>(null);
+
+  // Fetch single item method
+  const fetchItemById = async (id: number) => {
+    isLoadingItem.value = true;
+
+    const response = await get(`${settings.endpoint}/${id}`);
+    dataItem.value = response || null;
+
+    isLoadingItem.value = false;
+
+    return dataItem.value;
+  };
+
+  // List configuration
+  const isLoadingList = ref(false);
+  const dataList = ref<T[]>([]);
+  const total = ref(0);
+  const page = ref(1);
+  const limit = ref(10);
+
+  // Filter configuration
+  const searchValue = ref<string>('');
+  const sortField = ref<keyof T>('id');
+  const sortOrder = ref<1 | -1>(1);
+
+  // Error configuration
+  const errors = ref([]);
+
+  // Helper function to create query params
+  // This varies based on your API design
+  const createQueryParams = (params: Partial<FetchListOptions<T>>): string => {
+    const query = new URLSearchParams();
+
+    if (params.page) {
+      query.append('page', String(params.page));
+    }
+    if (params.limit) {
+      query.append('limit', String(params.limit));
+    }
+    if (params.search && params.search.trim() !== '') {
+      query.append('search', params.search);
+    }
+    if (params.sortBy) {
+      query.append('sortBy', String(params.sortBy));
+    }
+    if (params.sortOrder) {
+      query.append('sortOrder', params.sortOrder === -1 ? 'desc' : 'asc');
+    }
+
+    return query.toString();
+  };
+
+  // Fetch list methods
+  const setFetchListOptions = (options: Partial<FetchListOptions<T>>) => {
+    if (options.page) page.value = options.page;
+    if (options.limit) limit.value = options.limit;
+    if (options.search) searchValue.value = options.search;
+    if (options.sortBy) sortField.value = options.sortBy;
+    if (options.sortOrder) sortOrder.value = options.sortOrder;
+  };
+
+  const fetchList = async (fetchOptions?: Partial<FetchListOptions<T>>) => {
+    if (fetchOptions) {
+      setFetchListOptions(fetchOptions);
+    }
+
+    isLoadingList.value = true;
+
+    const response = await get(
+      `${settings.endpoint}?${createQueryParams({
+        page: page.value,
+        limit: limit.value,
+        search: searchValue.value,
+        sortBy: sortField.value,
+        sortOrder: sortOrder.value,
+      })}`
+    );
+
+    dataList.value = response[settings.listDataKey] || [];
+    total.value = response.total || 0;
+
+    isLoadingList.value = false;
+
+    return dataList.value;
+  };
+
+  // Mutation methods (create, update, delete)
+  const createItem = async (itemData: Partial<T>) => {
+    if (isCreatingItem.value) return;
+
+    isCreatingItem.value = true;
+
+    errors.value = [];
+
+    try {
+      dataItem.value = await post(settings.endpoint, itemData);
+    } catch (error: any) {
+      errors.value = error.message || ['An error occurred while creating the item.'];
+      throw error;
+    } finally {
+      isCreatingItem.value = false;
+    }
+
+    return dataItem.value;
+  };
+
+  const updateItem = async (id: number, itemData: Partial<T>) => {
+    if (isUpdatingItem.value) return;
+
+    isUpdatingItem.value = true;
+
+    errors.value = [];
+
+    try {
+      dataItem.value = await put(`${settings.endpoint}/${id}`, itemData);
+    } catch (error: any) {
+      errors.value = error.message || ['An error occurred while updating the item.'];
+      throw error;
+    } finally {
+      isUpdatingItem.value = false;
+    }
+
+    return dataItem.value;
+  };
+
+  const deleteItem = async (id: number) => {
+    if (isDeletingItem.value) return;
+
+    isDeletingItem.value = true;
+
+    errors.value = [];
+
+    try {
+      await del(`${settings.endpoint}/${id}`);
+      dataItem.value = null;
+    } catch (error: any) {
+      errors.value = error.message || ['An error occurred while deleting the item.'];
+      throw error;
+    } finally {
+      isDeletingItem.value = false;
+    }
+  };
+
+  // Expose methods and state
+  const setPage = (newPage: number) => {
+    page.value = newPage;
+  };
+
+  const setLimit = (newLimit: number) => {
+    limit.value = newLimit;
+  };
+
+  const setSearchValue = (newSearch: string) => {
+    searchValue.value = newSearch;
+  };
+
+  const setSortField = (newSortField: keyof T) => {
+    sortField.value = newSortField;
+  };
+
+  const setSortOrder = (newSortOrder: 1 | -1) => {
+    sortOrder.value = newSortOrder;
+  };
+
+  const setSort = (newSortField: keyof T, newSortOrder: 1 | -1) => {
+    setSortField(newSortField);
+    setSortOrder(newSortOrder);
+  };
+};
+```
+
+### return all methods and state
+
+Finally, we return all the methods and state we created in the composable.
+
+```ts title="composables/useEntity.ts" ins={177-213} collapse={2-176}
+export const useEntity = <T extends { id: number }>(settings: EntitySettings) => {
+  const { get, post, put, del } = useApi('https://fakerapi.it/api/v2/');
+
+  // reactive variable to hold loading state
+  const isLoadingItem = ref(false);
+  // reactive variable to hold the fetched item
+  const dataItem = ref<T | null>(null);
+
+  // Fetch single item method
+  const fetchItemById = async (id: number) => {
+    isLoadingItem.value = true;
+
+    const response = await get(`${settings.endpoint}/${id}`);
+    dataItem.value = response || null;
+
+    isLoadingItem.value = false;
+
+    return dataItem.value;
+  };
+
+  // List configuration
+  const isLoadingList = ref(false);
+  const dataList = ref<T[]>([]);
+  const total = ref(0);
+  const page = ref(1);
+  const limit = ref(10);
+
+  // Filter configuration
+  const searchValue = ref<string>('');
+  const sortField = ref<keyof T>('id');
+  const sortOrder = ref<1 | -1>(1);
+
+  // Error configuration
+  const errors = ref([]);
+
+  // Helper function to create query params
+  // This varies based on your API design
+  const createQueryParams = (params: Partial<FetchListOptions<T>>): string => {
+    const query = new URLSearchParams();
+
+    if (params.page) {
+      query.append('page', String(params.page));
+    }
+    if (params.limit) {
+      query.append('limit', String(params.limit));
+    }
+    if (params.search && params.search.trim() !== '') {
+      query.append('search', params.search);
+    }
+    if (params.sortBy) {
+      query.append('sortBy', String(params.sortBy));
+    }
+    if (params.sortOrder) {
+      query.append('sortOrder', params.sortOrder === -1 ? 'desc' : 'asc');
+    }
+
+    return query.toString();
+  };
+
+  // Fetch list methods
+  const setFetchListOptions = (options: Partial<FetchListOptions<T>>) => {
+    if (options.page) page.value = options.page;
+    if (options.limit) limit.value = options.limit;
+    if (options.search) searchValue.value = options.search;
+    if (options.sortBy) sortField.value = options.sortBy;
+    if (options.sortOrder) sortOrder.value = options.sortOrder;
+  };
+
+  const fetchList = async (fetchOptions?: Partial<FetchListOptions<T>>) => {
+    if (fetchOptions) {
+      setFetchListOptions(fetchOptions);
+    }
+
+    isLoadingList.value = true;
+
+    const response = await get(
+      `${settings.endpoint}?${createQueryParams({
+        page: page.value,
+        limit: limit.value,
+        search: searchValue.value,
+        sortBy: sortField.value,
+        sortOrder: sortOrder.value,
+      })}`
+    );
+
+    dataList.value = response[settings.listDataKey] || [];
+    total.value = response.total || 0;
+
+    isLoadingList.value = false;
+
+    return dataList.value;
+  };
+
+  // Mutation methods (create, update, delete)
+  const createItem = async (itemData: Partial<T>) => {
+    if (isCreatingItem.value) return;
+
+    isCreatingItem.value = true;
+
+    errors.value = [];
+
+    try {
+      dataItem.value = await post(settings.endpoint, itemData);
+    } catch (error: any) {
+      errors.value = error.message || ['An error occurred while creating the item.'];
+      throw error;
+    } finally {
+      isCreatingItem.value = false;
+    }
+
+    return dataItem.value;
+  };
+
+  const updateItem = async (id: number, itemData: Partial<T>) => {
+    if (isUpdatingItem.value) return;
+
+    isUpdatingItem.value = true;
+
+    errors.value = [];
+
+    try {
+      dataItem.value = await put(`${settings.endpoint}/${id}`, itemData);
+    } catch (error: any) {
+      errors.value = error.message || ['An error occurred while updating the item.'];
+      throw error;
+    } finally {
+      isUpdatingItem.value = false;
+    }
+
+    return dataItem.value;
+  };
+
+  const deleteItem = async (id: number) => {
+    if (isDeletingItem.value) return;
+
+    isDeletingItem.value = true;
+
+    errors.value = [];
+
+    try {
+      await del(`${settings.endpoint}/${id}`);
+      dataItem.value = null;
+    } catch (error: any) {
+      errors.value = error.message || ['An error occurred while deleting the item.'];
+      throw error;
+    } finally {
+      isDeletingItem.value = false;
+    }
+  };
+
+  // Expose methods and state
+  const setPage = (newPage: number) => {
+    page.value = newPage;
+  };
+
+  const setLimit = (newLimit: number) => {
+    limit.value = newLimit;
+  };
+
+  const setSearchValue = (newSearch: string) => {
+    searchValue.value = newSearch;
+  };
+
+  const setSortField = (newSortField: keyof T) => {
+    sortField.value = newSortField;
+  };
+
+  const setSortOrder = (newSortOrder: 1 | -1) => {
+    sortOrder.value = newSortOrder;
+  };
+
+  const setSort = (newSortField: keyof T, newSortOrder: 1 | -1) => {
+    setSortField(newSortField);
+    setSortOrder(newSortOrder);
+  };
+
+  return {
+    // list
+    setFetchListOptions,
+    fetchList,
+    isLoadingList,
+    dataList,
+
+    // single item
+    fetchItemById,
+    isLoadingItem,
+    dataItem,
+
+    // mutations
+    createItem,
+    isCreatingItem,
+    updateItem,
+    isUpdatingItem,
+    deleteItem,
+    isDeletingItem,
+
+    // pagination and filters
+    total,
+    page,
+    limit,
+    searchValue,
+    sortField,
+    sortOrder,
+    setPage,
+    setLimit,
+    setSearchValue,
+    setSortField,
+    setSortOrder,
+    setSort,
+
+    // errors
+    errors,
+  };
+};
+```
+
+## Specific entity composable for User entity
+
+Now, we have a generic entity composable, we can create specific entity composables for different entities.
+
+Let's start with a User entity composable:
+
+```ts title="composables/entities/useUsers.ts"
+import { useEntity } from '../useEntity';
+
+// Define the User type
+export type User = {
+  id: number;
+  firstname: string;
+  lastname: string;
+  email: string;
+};
+
+export const useUsers = () => {
+  // utilize the generic useEntity composable for the User entity
+  const userEntity = useEntity<User>({
+    endpoint: 'users',
+    listDataKey: 'data',
+  });
+
+  return {
+    // return all methods and state from the user entity composable
+    ...userEntity,
+  };
+};
+```
+
+That's it! We now have a simple and reusable API fetch composable in Vue.js that can be easily extended for different entities.
+
+### Method and property aliases
+
+To make it easier to use the specific entity composable, we can create some method and property aliases.
+
+```ts title="composables/entities/useUsers.ts" ins={22-39} collapse={1-17}
+import { useEntity } from '../useEntity';
+
+// Define the User type
+export type User = {
+  id: number;
+  firstname: string;
+  lastname: string;
+  email: string;
+};
+
+export const useUsers = () => {
+  // utilize the generic useEntity composable for the User entity
+  const userEntity = useEntity<User>({
+    endpoint: 'users',
+    listDataKey: 'data',
+  });
+
+  return {
+    // return all methods and state from the user entity composable
+    ...userEntity,
+
+    // aliases for user specific methods and properties
+    users: userEntity.dataList,
+    user: userEntity.dataItem,
+
+    totalUsers: userEntity.total,
+
+    isLoadingUsers: userEntity.isLoadingList,
+    isLoadingUser: userEntity.isLoadingItem,
+    isCreatingUser: userEntity.isCreatingItem,
+    isUpdatingUser: userEntity.isUpdatingItem,
+    isDeletingUser: userEntity.isDeletingItem,
+
+    fetchUsers: userEntity.fetchList,
+    fetchUserById: userEntity.fetchItemById,
+
+    createUser: userEntity.createItem,
+    updateUser: userEntity.updateItem,
+    deleteUser: userEntity.deleteItem,
+  };
+};
+```
+
+### Usage
+
+Now, we can use the specific entity composable in our Vue components.
+
+```vue title="src/components/UserList.vue"
+<template>
+  <div>
+    User List Component
+
+    <div v-if="isLoadingUsers">Loading users...</div>
+
+    <ul v-if="!isLoadingUsers">
+      <li
+        v-for="user in users"
+        :key="user.id"
+      >
+        {{ user.firstname }} {{ user.lastname }} - {{ user.email }}
+      </li>
+    </ul>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { onMounted } from 'vue';
+import { useUsers } from '../composables/entities/useUsers';
+
+const { isLoadingUsers, users, fetchUsers } = useUsers();
+
+onMounted(async () => {
+  await fetchUsers();
+});
+</script>
+
+```
+
+As you see, we updated our `UserList` component to use the `useUsers` composable. It's much cleaner now, and also has a loading state.
+
+## Final notes
+
+As you may noticed, the faker api is not capable to handle REST operations like create, update or delete or single views. To have a fully working REST API, you could create a mock api here: (https://jsoning.com/api/).
+
+Don't forget to update the apiUrl in the `useEntity` composable to point to your mock api.

@@ -1,6 +1,7 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
+import { pluginCollapsibleSections } from '@expressive-code/plugin-collapsible-sections';
 import { pluginFileIcons } from '@xt0rted/expressive-code-file-icons';
 import tailwindcss from '@tailwindcss/vite';
 import starlightGiscus from 'starlight-giscus';
@@ -39,11 +40,15 @@ export default defineConfig({
       ],
 
       expressiveCode: {
+        defaultProps: {
+          collapseStyle: 'collapsible-auto',
+        },
         plugins: [
           pluginFileIcons({
             iconClass: 'size-4',
             titleClass: 'flex items-center gap-1',
           }),
+          pluginCollapsibleSections(),
         ],
       },
 
