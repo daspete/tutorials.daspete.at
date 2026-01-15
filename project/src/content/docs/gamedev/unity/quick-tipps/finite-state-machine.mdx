@@ -1,0 +1,172 @@
+---
+title: Finite State Machine in Unity
+description: How to implement a Finite State Machine in Unity
+prev: false
+sidebar:
+  label: Finite State Machine
+---
+
+A Finite State Machine (FSM) is a computational model used to design algorithms and systems that can be in one of a finite number of states at any given time.
+In game development, FSMs are commonly used to manage the behavior of game entities, such as characters, enemies, or game mechanics.
+An FSM consists of a set of states, transitions between those states, and actions that occur when entering, exiting, or during a state.
+
+## The FiniteStateMachine class
+
+First, we need a base class for our Finite State Machine. This class will manage the current state and handle state transitions.
+This class has a `GetInitialState` method that can be overridden to define the starting state of the FSM. It also includes methods for updating the current state during the Unity lifecycle methods (`Update`, `FixedUpdate`, and `LateUpdate`).
+And there is a `ChangeState` method to handle transitions between states.
+
+```csharp title="FiniteStateMachine.cs"
+using UnityEngine;
+
+public class FiniteStateMachine : MonoBehaviour {
+    [SerializeField] protected FiniteStateMachineState state;
+
+    private void Start() {
+        state = GetInitialState();
+
+        state?.Enter();
+    }
+
+    private void Update() {
+        state?.Update();
+    }
+
+    private void FixedUpdate() {
+        state?.FixedUpdate();
+    }
+
+    private void LateUpdate() {
+        state?.LateUpdate();
+    }
+
+    public void ChangeState(FiniteStateMachineState newState) {
+        state?.Exit();
+        state = newState;
+        state?.Enter();
+    }
+
+    protected virtual FiniteStateMachineState GetInitialState() {
+        return null;
+    }
+}
+```
+
+## The FiniteStateMachineState class
+
+Next, we need a base class for the states of our FSM. This class will define the methods that can be overridden by specific states to implement their behavior. Each state has a reference to the FSM it belongs to, allowing it to trigger state transitions when needed.
+
+```csharp title="FiniteStateMachineState.cs"
+using System;
+
+[Serializable]
+public class FiniteStateMachineState {
+    public string name;
+
+    protected FiniteStateMachine fsm;
+
+    public FiniteStateMachineState(string name, FiniteStateMachine fsm) {
+        this.name = name;
+        this.fsm = fsm;
+    }
+
+    public virtual void Enter() { }
+    public virtual void Update() { }
+    public virtual void FixedUpdate() { }
+    public virtual void LateUpdate() { }
+    public virtual void Exit() { }
+}
+```
+
+With these two classes, you can create specific states by inheriting from `FiniteStateMachineState` and implementing the desired behavior in the overridden methods.
+
+## Example usage
+
+Here's an example of how to use the FSM pattern to create a simple Entity with two states: `IdleState` and `MoveState`. 
+Nothing special, just be two seconds in idle state then switch to move state and walk to a random position, 
+then switch back to idle state and so on.
+
+```csharp title="Entity.cs"
+using UnityEngine;
+
+public class Entity : FiniteStateMachine {
+    public float moveSpeed = 5f;
+
+    public Vector3 targetPosition;
+
+    public EntityMoveState moveState;
+    public EntityIdleState idleState;
+
+    void Awake() {
+        moveState = new EntityMoveState(this);
+        idleState = new EntityIdleState(this);
+    }
+
+    protected override FiniteStateMachineState GetInitialState() {
+        return idleState;
+    }
+}
+```
+
+```csharp title="EntityIdleState.cs"
+using UnityEngine;
+
+public class EntityIdleState : FiniteStateMachineState {
+    Entity entity;
+
+    float maxIdleTime = 2f;
+    float idleStartTime;
+
+    public EntityIdleState(Entity _entity) : base("Idle", _entity) {
+        entity = _entity;
+    }
+
+    public override void Enter() {
+        base.Enter();
+
+        idleStartTime = Time.time;
+    }
+
+    public override void Update() {
+        base.Update();
+
+        // After idling for a certain time, switch to move state
+        if (Time.time - idleStartTime >= maxIdleTime) {
+            fsm.ChangeState(entity.moveState);
+        }
+    }
+}
+```
+
+```csharp title="EntityMoveState.cs"
+using UnityEngine;
+
+public class EntityMoveState : FiniteStateMachineState {
+    Entity entity;
+
+    public EntityMoveState(Entity _entity) : base("Move", _entity) {
+        entity = _entity;
+    }
+
+    public override void Enter() {
+        base.Enter();
+
+        // Set a random target position within a certain range
+        entity.targetPosition = new Vector3(Random.Range(-10f, 10f), 0, Random.Range(-10f, 10f));
+    }
+
+    public override void Update() {
+        base.Update();
+
+        Vector3 direction = (entity.targetPosition - entity.transform.position).normalized;
+        entity.transform.position += direction * entity.moveSpeed * Time.deltaTime;
+
+        if (Vector3.Distance(entity.transform.position, entity.targetPosition) < 0.1f) {
+            // Reached target position, switch to idle state
+            fsm.ChangeState(entity.idleState);
+        }
+    }
+}
+```
+
+This is the base for much more complex Finite State Machines you can create in Unity.
