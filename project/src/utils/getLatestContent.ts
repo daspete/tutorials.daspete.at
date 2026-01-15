@@ -1,6 +1,6 @@
 import { getCollection } from 'astro:content';
 
-export const getLatestContent = async (parentSlug: string = '', limit: number = 4) => {
+export const getLatestContent = async (parentSlug: string = '', limit: number = 8) => {
     const collection = await getCollection('docs');
     const items = collection.filter(item => {
         if(!item.filePath) return false;
